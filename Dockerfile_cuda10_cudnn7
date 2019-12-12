@@ -1,0 +1,86 @@
+FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu18.04
+MAINTAINER Robert Hong <jacky1127s@gmail.com>
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    apt-utils git curl vim unzip openssh-client wget \
+    build-essential cmake \
+    libopenblas-dev
+
+# Python 3.6
+RUN apt-get install -y --no-install-recommends python3.6 python3.6-dev python3-pip python3-tk && \
+    pip3 install --no-cache-dir --upgrade pip setuptools && \
+    echo "alias python='python3'" >> /root/.bash_aliases && \
+    echo "alias pip='pip3'" >> /root/.bash_aliases
+
+# Pillow and it's dependencies
+RUN apt-get install -y --no-install-recommends libjpeg-dev zlib1g-dev && \
+    pip3 --no-cache-dir install Pillow
+
+
+# Science libraries and other common packages
+RUN pip3 --no-cache-dir install \
+    numpy scipy sklearn scikit-image pandas matplotlib Cython requests
+
+# Jupyter notebook
+RUN pip3 --no-cache-dir install jupyter && \
+    mkdir /root/.jupyter && \
+    echo "c.NotebookApp.ip = '*'" \
+         "\nc.NotebookApp.open_browser = False" \
+         "\nc.NotebookApp.token = ''" \
+         > /root/.jupyter/jupyter_notebook_config.py
+EXPOSE 8888
+
+# Expose port for TensorBoard
+EXPOSE 6006
+
+
+# OpenCV 3.4.1
+#
+# Dependencies
+
+
+RUN apt-get install -y --no-install-recommends \
+    libjpeg8-dev libtiff5-dev libpng-dev \
+    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libgtk2.0-dev \
+    liblapacke-dev checkinstall
+
+RUN apt-get install -y --no-install-recommends \
+    software-properties-common
+RUN apt-add-repository 'deb http://security.ubuntu.com/ubuntu xenial-security main'
+RUN apt-get update -y --no-install-recommends
+RUN apt-get install -y --no-install-recommends \
+    libjasper1 libjasper-dev
+
+# Get source from github
+RUN git clone -b 3.4.1 --depth 1 https://github.com/opencv/opencv.git /usr/local/src/opencv
+# Compile
+RUN cd /usr/local/src/opencv && mkdir build && cd build && \
+    cmake -D CMAKE_INSTALL_PREFIX=/usr/local \
+          -D BUILD_TESTS=OFF \
+          -D BUILD_PERF_TESTS=OFF \
+          -D PYTHON_DEFAULT_EXECUTABLE=$(which python3) \
+          .. && \
+    make -j"$(nproc)" && \
+    make install
+
+
+# opencv-python
+RUN pip3 install opencv-python
+
+# DL framework
+
+# Tensorflow 1.13.1 - GPU
+RUN pip3 install tensorflow-gpu==1.13.1
+
+
+# Keras 2.2.4 
+RUN pip3 install keras==2.2.4
+
+RUN pip3 install --no-cache-dir git+https://github.com/waleedka/coco.git#subdirectory=PythonAPI
+
+
+
+WORKDIR "/root"
+CMD ["/bin/bash"]
+
